@@ -1,0 +1,28 @@
+# Binary files (FFmpeg, FFprobe, MediaMTX)
+ffmpeg-*
+ffprobe-*
+mediamtx
+
+# Recordings (videos)
+recordings/
+*.mp4
+
+# Logs and temp files
+tmp/
+*.log
+nohup.out
+
+# Generated web server files
+webserver/www/
+
+# System files
+System Volume Information/
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

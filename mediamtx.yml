@@ -1,0 +1,11 @@
+logLevel: warn
+readTimeout: 20s
+writeTimeout: 20s
+
+paths:
+  camera:
+    source: rtsp://admin:admin12345@192.168.1.20:554/
+    sourceProtocol: tcp
+    sourceOnDemand: yes
+    runOnDemandStartTimeout: 10s
+    runOnDemandCloseAfter: 30s
