@@ -22,9 +22,13 @@ h1{text-align:center;font-size:28px;margin-bottom:25px;color:#3498db}
 .container{display:flex;gap:20px;max-width:1400px;margin:0 auto}
 .left-panel{flex:1;min-width:300px;max-width:400px}
 .right-panel{flex:2;min-width:500px}
-#player-container{background:#000;border-radius:10px;padding:15px;margin-bottom:20px;min-height:450px;display:flex;align-items:center;justify-content:center}
+#player-container{background:#000;border-radius:10px;padding:15px;margin-bottom:20px;min-height:450px;display:flex;align-items:center;justify-content:center;position:relative}
 #player-container video{width:100%;max-height:500px;border-radius:8px;background:#000}
 #player-container .placeholder{color:#777;font-size:18px;text-align:center}
+#livestream{width:100%;max-height:500px;border-radius:8px;background:#000;display:none}
+#recording-indicator{display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:15px}
+#recording-indicator .icon{font-size:64px;animation:pulse 1.5s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.6;transform:scale(1.1)}}
 .controls{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
 .controls button{padding:10px 16px;font-size:14px;border:none;border-radius:8px;cursor:pointer;font-weight:600;transition:all 0.3s;position:relative}
 .controls button:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,0.3)}
@@ -70,7 +74,13 @@ h1{text-align:center;font-size:28px;margin-bottom:25px;color:#3498db}
 <div class="right-panel">
 <div id="player-container">
 <div class="placeholder">Select a recording to play</div>
+<img id="livestream" src="/tmp/livestream.jpg">
 <video id="player" controls style="display:none;" preload="metadata"></video>
+<div id="recording-indicator">
+<div class="icon">🔴</div>
+<div style="font-size:24px;font-weight:bold;color:#e74c3c">Recording in Progress</div>
+<div style="font-size:16px;color:#999">Video is being saved to storage</div>
+</div>
 </div>
 <div class="controls">
 <button id="start" onclick="doStart()">▶️ Start Record</button>
@@ -81,15 +91,42 @@ h1{text-align:center;font-size:28px;margin-bottom:25px;color:#3498db}
 </div>
 </div>
 <script>
+var liveRefresh;
 function showStatus(m,t){
 var s=document.getElementById('status');
 s.textContent=m;
 s.className='show '+t;
 setTimeout(function(){s.className=''},5000);
 }
+function startLiveRefresh(){
+stopLiveRefresh();
+var img=document.getElementById('livestream');
+img.style.display='block';
+document.getElementById('player').style.display='none';
+document.querySelector('.placeholder').style.display='none';
+document.getElementById('recording-indicator').style.display='none';
+liveRefresh=setInterval(function(){
+img.src='/tmp/livestream.jpg?t='+Date.now();
+},1000);
+}
+function stopLiveRefresh(){
+if(liveRefresh){
+clearInterval(liveRefresh);
+liveRefresh=null;
+}
+}
+function showRecordingIndicator(){
+stopLiveRefresh();
+document.getElementById('livestream').style.display='none';
+document.getElementById('player').style.display='none';
+document.getElementById('recording-indicator').style.display='flex';
+}
 function playVideo(f){
+stopLiveRefresh();
 var p=document.getElementById('player');
 var ph=document.querySelector('.placeholder');
+document.getElementById('livestream').style.display='none';
+document.getElementById('recording-indicator').style.display='none';
 p.src='/cgi-bin/video.sh?f='+f;
 p.style.display='block';
 ph.style.display='none';
@@ -139,6 +176,7 @@ showStatus('Starting recording system...','info');
 fetch('/cgi-bin/start.sh').then(function(r){return r.text()})
 .then(function(t){
 showStatus('✅ '+t,'success');
+showRecordingIndicator();
 btn.innerHTML='▶️ Start Record';
 btn.disabled=false;
 }).catch(function(e){
@@ -153,6 +191,8 @@ btn.disabled=true;
 btn.innerHTML='⏳ Stopping...<span class="spinner"></span>';
 fetch('/cgi-bin/stop.sh').then(function(r){return r.text()})
 .then(function(t){
+showStatus('✅ '+t,'success');
+startLiveRefresh();
 btn.innerHTML='⏹️ Stop Record';
 btn.disabled=false;
 }).catch(function(e){
@@ -177,7 +217,10 @@ document.body.innerHTML='<h1 style="color:#e74c3c;text-align:center">🛑 NVR Sy
 });
 }
 }
-window.onload=function(){loadRecordings()};
+window.onload=function(){
+loadRecordings();
+startLiveRefresh();
+};
 </script>
 </body>
 </html>
@@ -228,6 +271,7 @@ cat > "$CGIROOT/start.sh" << 'CGI_START'
 #!/bin/sh
 echo "Content-type: text/plain"
 echo ""
+killall -9 snapshot_loop.sh 2>/dev/null
 /mnt/mmcblk0p1/startup.sh >/dev/null 2>&1 &
 echo "Recording Started"
 CGI_START
@@ -238,6 +282,7 @@ cat > "$CGIROOT/stop.sh" << 'CGI_STOP'
 echo "Content-type: text/plain"
 echo ""
 /mnt/mmcblk0p1/endprocess.sh
+/mnt/mmcblk0p1/start_livestream.sh >/dev/null 2>&1 &
 echo "Recording Stopped"
 CGI_STOP
 
