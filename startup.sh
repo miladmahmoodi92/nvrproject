@@ -1,10 +1,6 @@
 #!/bin/sh
 cd /mnt/mmcblk0p1
 
-# Kill snapshot loop first
-killall -9 snapshot_loop.sh 2>/dev/null
-killall -9 timeout 2>/dev/null
-
 mkdir -p recordings
 
 # Find last number
@@ -20,7 +16,7 @@ killall -9 ffmpeg_wrapper.sh 2>/dev/null
 killall -9 ffmpeg 2>/dev/null
 killall -9 ffmpeg-3.2 2>/dev/null
 
-# Create simple wrapper
+# Create wrapper
 cat > /tmp/ffmpeg_wrapper.sh << 'WRAPPER'
 #!/bin/sh
 cd /mnt/mmcblk0p1
@@ -48,4 +44,4 @@ WRAPPER
 chmod +x /tmp/ffmpeg_wrapper.sh
 nohup /tmp/ffmpeg_wrapper.sh >/dev/null 2>&1 &
 
-echo "OK"
+echo "OK - Recording MP4 (optimized flags)"

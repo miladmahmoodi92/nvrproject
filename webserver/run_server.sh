@@ -7,7 +7,7 @@ sleep 2
 rm -rf "$WWWROOT"
 mkdir -p "$CGIROOT"
 
-# --- HTML ---
+# --- HTML با Recording Indicator ---
 cat > "$WWWROOT/index.html" << 'HTML'
 <!DOCTYPE html>
 <html>
@@ -22,13 +22,13 @@ h1{text-align:center;font-size:28px;margin-bottom:25px;color:#3498db}
 .container{display:flex;gap:20px;max-width:1400px;margin:0 auto}
 .left-panel{flex:1;min-width:300px;max-width:400px}
 .right-panel{flex:2;min-width:500px}
-#player-container{background:#000;border-radius:10px;padding:15px;margin-bottom:20px;min-height:450px;display:flex;align-items:center;justify-content:center;position:relative}
+#player-container{background:#000;border-radius:10px;padding:15px;margin-bottom:20px;min-height:450px;display:flex;align-items:center;justify-content:center}
+#player-container img{width:100%;max-height:500px;border-radius:8px;background:#000}
 #player-container video{width:100%;max-height:500px;border-radius:8px;background:#000}
-#player-container .placeholder{color:#777;font-size:18px;text-align:center}
-#livestream{width:100%;max-height:500px;border-radius:8px;background:#000;display:none}
-#recording-indicator{display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:15px}
-#recording-indicator .icon{font-size:64px;animation:pulse 1.5s ease-in-out infinite}
-@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.6;transform:scale(1.1)}}
+#player-container .placeholder{color:#999;font-size:20px;text-align:center;padding:40px}
+#recording-indicator{display:none;flex-direction:column;align-items:center;gap:20px}
+#recording-indicator .icon{font-size:60px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
 .controls{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
 .controls button{padding:10px 16px;font-size:14px;border:none;border-radius:8px;cursor:pointer;font-weight:600;transition:all 0.3s;position:relative}
 .controls button:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,0.3)}
@@ -73,8 +73,7 @@ h1{text-align:center;font-size:28px;margin-bottom:25px;color:#3498db}
 </div>
 <div class="right-panel">
 <div id="player-container">
-<div class="placeholder">Select a recording to play</div>
-<img id="livestream" src="/tmp/livestream.jpg">
+<img id="livestream" src="/cgi-bin/stream.sh" style="display:block;">
 <video id="player" controls style="display:none;" preload="metadata"></video>
 <div id="recording-indicator">
 <div class="icon">🔴</div>
@@ -91,28 +90,18 @@ h1{text-align:center;font-size:28px;margin-bottom:25px;color:#3498db}
 </div>
 </div>
 <script>
-var liveRefresh;
-function showStatus(m,t){
-var s=document.getElementById('status');
-s.textContent=m;
-s.className='show '+t;
-setTimeout(function(){s.className=''},5000);
-}
+var liveRefreshInterval;
 function startLiveRefresh(){
-stopLiveRefresh();
 var img=document.getElementById('livestream');
-img.style.display='block';
-document.getElementById('player').style.display='none';
-document.querySelector('.placeholder').style.display='none';
-document.getElementById('recording-indicator').style.display='none';
-liveRefresh=setInterval(function(){
-img.src='/tmp/livestream.jpg?t='+Date.now();
-},1000);
+liveRefreshInterval=setInterval(function(){
+if(img.style.display==='block'){
+img.src='/cgi-bin/stream.sh?t='+(new Date()).getTime();
+}
+},200);
 }
 function stopLiveRefresh(){
-if(liveRefresh){
-clearInterval(liveRefresh);
-liveRefresh=null;
+if(liveRefreshInterval){
+clearInterval(liveRefreshInterval);
 }
 }
 function showRecordingIndicator(){
@@ -121,20 +110,38 @@ document.getElementById('livestream').style.display='none';
 document.getElementById('player').style.display='none';
 document.getElementById('recording-indicator').style.display='flex';
 }
+function showStatus(m,t){
+var s=document.getElementById('status');
+s.textContent=m;
+s.className='show '+t;
+setTimeout(function(){s.className=''},5000);
+}
 function playVideo(f){
 stopLiveRefresh();
 var p=document.getElementById('player');
-var ph=document.querySelector('.placeholder');
-document.getElementById('livestream').style.display='none';
-document.getElementById('recording-indicator').style.display='none';
+var ls=document.getElementById('livestream');
+var rec=document.getElementById('recording-indicator');
 p.src='/cgi-bin/video.sh?f='+f;
 p.style.display='block';
-ph.style.display='none';
+ls.style.display='none';
+rec.style.display='none';
 p.load();
 p.play();
 var items=document.querySelectorAll('#recordings-list li');
 items.forEach(function(i){i.classList.remove('active')});
 event.target.closest('li').classList.add('active');
+}
+function backToLive(){
+var p=document.getElementById('player');
+var ls=document.getElementById('livestream');
+var rec=document.getElementById('recording-indicator');
+p.style.display='none';
+rec.style.display='none';
+ls.style.display='block';
+ls.src='/cgi-bin/stream.sh?t='+(new Date()).getTime();
+startLiveRefresh();
+var items=document.querySelectorAll('#recordings-list li');
+items.forEach(function(i){i.classList.remove('active')});
 }
 function loadRecordings(){
 var list=document.getElementById('recordings-list');
@@ -192,9 +199,10 @@ btn.innerHTML='⏳ Stopping...<span class="spinner"></span>';
 fetch('/cgi-bin/stop.sh').then(function(r){return r.text()})
 .then(function(t){
 showStatus('✅ '+t,'success');
-startLiveRefresh();
 btn.innerHTML='⏹️ Stop Record';
 btn.disabled=false;
+loadRecordings();
+backToLive();
 }).catch(function(e){
 showStatus('❌ '+e,'error');
 btn.innerHTML='⏹️ Stop Record';
@@ -226,7 +234,18 @@ startLiveRefresh();
 </html>
 HTML
 
-# --- CGI: List recordings with video metadata date ---
+# --- CGI: Livestream JPEG ---
+cat > "$CGIROOT/stream.sh" << 'CGI_STREAM'
+#!/bin/sh
+echo "Content-Type: image/jpeg"
+echo "Cache-Control: no-cache, no-store, must-revalidate"
+echo "Pragma: no-cache"
+echo "Expires: 0"
+echo ""
+cat /tmp/livestream.jpg 2>/dev/null || dd if=/dev/zero bs=1 count=1 2>/dev/null
+CGI_STREAM
+
+# --- CGI: List recordings ---
 cat > "$CGIROOT/list.sh" << 'CGI_LIST'
 #!/bin/sh
 echo "Content-type: application/json"
@@ -236,18 +255,7 @@ FIRST=1
 cd /mnt/mmcblk0p1/recordings
 for f in *.mp4; do
   [ -f "$f" ] || continue
-
-  # Get creation time from video metadata using ffprobe
-  DATETIME=$(/mnt/mmcblk0p1/ffprobe-3.2 -v quiet -show_entries format_tags=creation_time -of default=noprint_wrappers=1:nokey=1 "$f" 2>/dev/null | head -1)
-
-  # If no metadata, fallback to file modification time
-  if [ -z "$DATETIME" ]; then
-    DATETIME=$(stat -c %y "$f" 2>/dev/null | cut -d. -f1)
-  else
-    # Format: 2025-11-08T12:34:56.000000Z -> 2025-11-08 12:34:56
-    DATETIME=$(echo "$DATETIME" | sed 's/T/ /;s/\..*//')
-  fi
-
+  DATETIME=$(stat -c %y "$f" 2>/dev/null | cut -d. -f1)
   [ $FIRST -eq 0 ] && echo ","
   echo -n "{\"name\":\"$f\",\"date\":\"$DATETIME\"}"
   FIRST=0
@@ -272,6 +280,9 @@ cat > "$CGIROOT/start.sh" << 'CGI_START'
 echo "Content-type: text/plain"
 echo ""
 killall -9 snapshot_loop.sh 2>/dev/null
+killall -9 ffmpeg 2>/dev/null
+killall -9 ffmpeg-3.2 2>/dev/null
+sleep 1
 /mnt/mmcblk0p1/startup.sh >/dev/null 2>&1 &
 echo "Recording Started"
 CGI_START
@@ -282,17 +293,17 @@ cat > "$CGIROOT/stop.sh" << 'CGI_STOP'
 echo "Content-type: text/plain"
 echo ""
 /mnt/mmcblk0p1/endprocess.sh
+sleep 1
 /mnt/mmcblk0p1/start_livestream.sh >/dev/null 2>&1 &
-echo "Recording Stopped"
+echo "Recording Stopped - Livestream Resumed"
 CGI_STOP
 
-# --- CGI: Shutdown system ---
+# --- CGI: Shutdown ---
 cat > "$CGIROOT/shutdown.sh" << 'CGI_SHUTDOWN'
 #!/bin/sh
 echo "Content-type: text/plain"
 echo ""
 echo "Shutting down NVR system..."
-
 cat > /tmp/shutdown_nvr.sh << 'SHUTDOWN'
 #!/bin/sh
 sleep 1
@@ -302,7 +313,6 @@ for pid in $HTTPDPIDS; do
   kill -9 $pid 2>/dev/null
 done
 SHUTDOWN
-
 chmod +x /tmp/shutdown_nvr.sh
 nohup /tmp/shutdown_nvr.sh >/dev/null 2>&1 &
 CGI_SHUTDOWN
@@ -311,4 +321,8 @@ chmod +x "$CGIROOT"/*.sh
 
 echo "✅ Starting NVR server on port 8080..."
 busybox httpd -p 8080 -h "$WWWROOT"
+
+sleep 1
+/mnt/mmcblk0p1/start_livestream.sh >/dev/null 2>&1 &
+
 echo "✅ Server started! Access at http://192.168.1.10:8080"

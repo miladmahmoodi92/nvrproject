@@ -7,5 +7,3 @@ paths:
     source: rtsp://admin:admin12345@192.168.1.20:554/
     sourceProtocol: tcp
     sourceOnDemand: no
-    runOnDemandStartTimeout: 10s
-    runOnDemandCloseAfter: 30s
