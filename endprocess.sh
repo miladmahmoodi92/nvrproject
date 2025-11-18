@@ -1,5 +1,9 @@
 #!/bin/sh
-echo "⛔ Stopping recording and RTSP services..."
+echo "⛔ Stopping all NVR services..."
+
+# Stop snapshot loop first!
+killall -9 snapshot_loop.sh 2>/dev/null
+killall -9 timeout 2>/dev/null
 
 # Stop ffmpeg wrapper
 killall -9 ffmpeg_wrapper.sh 2>/dev/null
@@ -11,20 +15,19 @@ killall -9 ffmpeg-3.4 2>/dev/null
 killall -9 ffmpeg-4.0.1 2>/dev/null
 killall -9 ffmpeg-4.2.1 2>/dev/null
 
+# Extra cleanup - find any remaining ffmpeg
 FFPIDS="$(pgrep -f 'ffmpeg')"
 if [ -n "$FFPIDS" ]; then
-    echo "Stopping remaining ffmpeg (PIDs: $FFPIDS)..."
     for pid in $FFPIDS; do
         kill -9 $pid 2>/dev/null
     done
 fi
 
-# Stop mediamtx
+# Stop mediamtx (if running)
 MTPIDS="$(pgrep -f '[m]ediamtx')"
 if [ -n "$MTPIDS" ]; then
-    echo "Stopping mediamtx..."
-    kill -9 $MTPIDS
+    kill -9 $MTPIDS 2>/dev/null
     killall -9 mediamtx 2>/dev/null
 fi
 
-echo "✅ All related processes stopped."
+echo "✅ All services stopped."

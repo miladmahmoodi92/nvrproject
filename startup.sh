@@ -1,17 +1,9 @@
 #!/bin/sh
 cd /mnt/mmcblk0p1
 
-# Start Mediamtx
-if ! pidof mediamtx >/dev/null; then
-    ./mediamtx mediamtx.yml > /tmp/mediamtx.log 2>&1 &
-    sleep 1
-fi
-
-# Wait for RTSP (faster check)
-for i in $(seq 1 10); do
-    nc -zv 127.0.0.1 8554 >/dev/null 2>&1 && break
-    sleep 0.5
-done
+# Kill snapshot loop first
+killall -9 snapshot_loop.sh 2>/dev/null
+killall -9 timeout 2>/dev/null
 
 mkdir -p recordings
 
@@ -39,8 +31,12 @@ while true; do
 
     echo "$(date): Starting segment $NUM" >> /tmp/ffmpeg_wrapper.log
 
-    ./ffmpeg-3.2 -rtsp_transport tcp -i rtsp://127.0.0.1:8554/camera \
-        -c:v copy -an -f segment -segment_time 60 \
+    ./ffmpeg-3.2 -rtsp_transport tcp \
+        -i rtsp://admin:admin12345@192.168.1.20:554/ \
+        -c:v copy -an \
+        -fflags +genpts -avoid_negative_ts make_zero \
+        -f segment -segment_time 60 -segment_format mp4 \
+        -segment_format_options movflags=+frag_keyframe+empty_moov+default_base_moof \
         -reset_timestamps 1 -segment_start_number $NUM \
         recordings/%03d.mp4 >> /tmp/ffmpeg.log 2>&1
 
